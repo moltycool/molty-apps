@@ -13,13 +13,12 @@ const start = async () => {
 
   const server = createServer({
     port,
-    hostname: "localhost",
-    databaseUrl
+    databaseUrl,
   });
 
   server.listen();
   // eslint-disable-next-line no-console
-  console.log(`WakaWars server listening on http://localhost:${port}/wakawars/v0`);
+  console.log(`WakaWars server`);
 
   const shutdown = async () => {
     await server.close();
