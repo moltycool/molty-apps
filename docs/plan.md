@@ -1,10 +1,10 @@
-# Molty WakaTime Menu Bar App: Implementation Plan
+# WakaWars Menu Bar App: Implementation Plan
 
 ## Goals
 - macOS menu bar app to share WakaTime daily hours and show a daily leaderboard.
 - Local-only app: no external login or OAuth; user provides WakaTime API key during onboarding.
 - Users can add friends by username; app attempts to fetch their daily stats and handles private/forbidden data gracefully.
-- Monorepo with Electron (desktop), Vite + React (renderer UI), and Elysia (local server).
+- Monorepo with Electron (WakaWars), Vite + React (renderer UI), and Elysia (local server).
 - Production-ready, with tests and guarded edge cases.
 
 ---
@@ -66,11 +66,12 @@
 ---
 
 ## Selected Plan
-**Pick: Proposal A (embedded Elysia server in Electron main process)**
+**Pick: Proposal B (separate Elysia server process)**
 
 **Why**
-- Best balance for production: simplest packaging, minimal runtime dependencies, still preserves clean separation (renderer never handles secrets).
-- Works well with a local-only app and small data scale.
+- Required by the updated spec: server runs independently at `http://localhost:3000`.
+- Clean separation: Electron/renderer never import server code or handle secrets.
+- Easier to scale to future integrations (DB, migrations, background jobs).
 
 ---
 
@@ -80,8 +81,8 @@
 ```
 / (root)
   apps/
-    desktop/     # Electron + Vite (React)
-    server/      # Elysia server library (imported by main)
+    wakawars/    # Electron + Vite (React)
+    server/      # Elysia server (separate process)
   packages/
     shared/      # Shared types + utilities
   docs/
@@ -95,10 +96,11 @@
   - `leaderboard.ts`: stable sort & rank algorithm
   - Tests: edge cases for sorting, ties, rounding
 
-### 3) Elysia server (local HTTP)
+### 3) Elysia server (local HTTP + Prisma/Postgres)
 - `apps/server/src/app.ts`
-  - `createServer({ dataDir, port, fetch })`
-  - CORS enabled for `http://localhost:*` and `file://` / `null` origins.
+  - `createServer({ port, hostname, databaseUrl, fetch })`
+  - Runs at `http://localhost:3000` with prefix `/wakawars/v0`
+  - CORS enabled for `http://localhost:*` origins.
   - Endpoints:
     - `GET /health`
     - `GET /config` (public config, no API key)
@@ -106,8 +108,9 @@
     - `POST /friends` (add by username)
     - `DELETE /friends/:username`
     - `GET /stats/today` (leaderboard for today; handles private users)
-- `apps/server/src/storage.ts`
-  - Reads/writes `config.json` under an app data directory.
+- `apps/server/prisma/schema.prisma`
+  - `User` + `Friend` models
+  - Postgres provider, `DATABASE_URL` required
 - `apps/server/src/wakatime.ts`
   - `getStatusBarToday(user, apiKey)`
   - Handles 403/404 -> `private`/`not_found` status in results.
@@ -118,6 +121,7 @@
 - Create tray icon (template SVG data URL).
 - Build a popover-like window anchored under the menu bar icon.
 - Keep app running even when all windows are closed.
+- Connects to server at `http://localhost:3000`.
 - Start local Elysia server on a free port; expose API base to renderer via IPC.
 - Hide on blur; support multi-display and clamped positioning.
 

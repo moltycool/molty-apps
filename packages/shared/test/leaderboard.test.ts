@@ -12,9 +12,9 @@ describe("formatDuration", () => {
 });
 
 describe("formatDelta", () => {
-  it("uses same time under threshold", () => {
-    expect(formatDelta(0)).toBe("same time");
-    expect(formatDelta(299)).toBe("same time");
+  it("uses zero delta under threshold", () => {
+    expect(formatDelta(0)).toBe("0m");
+    expect(formatDelta(299)).toBe("0m");
   });
 
   it("shows sign and magnitude when above threshold", () => {

@@ -1,5 +1,5 @@
 export type Friend = {
-  username: string;
+  username: string; // WakaWars username (assumed to match WakaTime username)
   apiKey?: string | null;
 };
 
@@ -8,21 +8,23 @@ export type FriendPublic = {
 };
 
 export type UserConfig = {
-  username: string;
+  wakawarsUsername: string;
   apiKey: string;
   friends: Friend[];
+  passwordHash?: string | null;
 };
 
 export type PublicConfig = {
-  username: string;
+  wakawarsUsername: string;
   friends: FriendPublic[];
   hasApiKey: boolean;
+  passwordSet: boolean;
 };
 
 export type DailyStatStatus = "ok" | "private" | "not_found" | "error";
 
 export type DailyStat = {
-  username: string;
+  username: string; // WakaWars username
   totalSeconds: number;
   status: DailyStatStatus;
   error?: string | null;

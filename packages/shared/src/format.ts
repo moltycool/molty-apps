@@ -21,7 +21,7 @@ export const formatDelta = (deltaSeconds: number, thresholdSeconds = 300): strin
   }
 
   if (Math.abs(deltaSeconds) < thresholdSeconds) {
-    return "same time";
+    return formatDuration(0);
   }
 
   const sign = deltaSeconds > 0 ? "+" : "-";

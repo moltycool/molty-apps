@@ -1,15 +1,19 @@
-import { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen } from "electron";
+import electron, { type BrowserWindow as BrowserWindowType, type Tray as TrayType } from "electron";
+import electronUpdater from "electron-updater";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import net from "node:net";
-import { createServer } from "@molty/server";
+
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen } = electron;
+const { autoUpdater } = electronUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let tray: Tray | null = null;
-let mainWindow: BrowserWindow | null = null;
-let apiBase = "";
+let tray: TrayType | null = null;
+let mainWindow: BrowserWindowType | null = null;
+const apiBase = app.isPackaged
+  ? "https://wakawars.molty.app/wakawars/v0"
+  : "http://localhost:3000/wakawars/v0";
 let resolveApiBase: ((value: string) => void) | null = null;
 
 const apiBaseReady = new Promise<string>((resolve) => {
@@ -22,7 +26,6 @@ const createTrayIcon = () => {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
       <circle cx="9" cy="9" r="7" fill="black" />
-      <path d="M6 9h6" stroke="white" stroke-width="1.5" stroke-linecap="round" />
     </svg>
   `;
 
@@ -33,25 +36,6 @@ const createTrayIcon = () => {
   return icon;
 };
 
-const findAvailablePort = async (startPort: number, attempts = 20): Promise<number> => {
-  const isPortFree = (port: number) =>
-    new Promise<boolean>((resolve) => {
-      const tester = net
-        .createServer()
-        .once("error", () => resolve(false))
-        .once("listening", () => tester.close(() => resolve(true)))
-        .listen(port, "127.0.0.1");
-    });
-
-  for (let index = 0; index < attempts; index += 1) {
-    const port = startPort + index;
-    if (await isPortFree(port)) {
-      return port;
-    }
-  }
-
-  throw new Error("No free port found for local server");
-};
 
 const createWindow = () => {
   const preloadPath = path.join(__dirname, "preload.js");
@@ -63,7 +47,7 @@ const createWindow = () => {
     frame: false,
     resizable: false,
     transparent: false,
-    backgroundColor: "#f6f2ea",
+    backgroundColor: "#0a0f17",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,
@@ -122,7 +106,7 @@ const toggleWindow = () => {
 
 const createTray = () => {
   tray = new Tray(createTrayIcon());
-  tray.setToolTip("Molty WakaTime");
+  tray.setToolTip("WakaWars");
 
   tray.on("click", toggleWindow);
   tray.on("right-click", () => {
@@ -135,35 +119,44 @@ const createTray = () => {
   });
 };
 
-const startServer = async () => {
-  const port = await findAvailablePort(24680);
-  const dataDir = path.join(app.getPath("userData"), "server");
-  const server = createServer({ dataDir, port, hostname: "127.0.0.1" });
-  server.listen();
+const setupAutoUpdates = () => {
+  if (!app.isPackaged) return;
 
-  apiBase = `http://127.0.0.1:${port}`;
-  resolveApiBase?.(apiBase);
-
-  app.on("before-quit", () => {
-    server.app.server?.close();
+  autoUpdater.autoDownload = true;
+  autoUpdater.on("error", (error: unknown) => {
+    // eslint-disable-next-line no-console
+    console.error("Auto update error:", error);
   });
+  autoUpdater.checkForUpdatesAndNotify();
+};
+
+const resolveApiBaseReady = () => {
+  resolveApiBase?.(apiBase);
 };
 
 ipcMain.handle("get-api-base", () => apiBaseReady);
+ipcMain.handle("get-login-item-settings", () => app.getLoginItemSettings());
+ipcMain.handle("set-login-item-settings", (_event, openAtLogin: boolean) => {
+  app.setLoginItemSettings({
+    openAtLogin,
+    openAsHidden: true
+  });
+  return app.getLoginItemSettings();
+});
 
 app.whenReady().then(async () => {
-  await startServer();
+  app.setName("WakaWars");
+  resolveApiBaseReady();
   createWindow();
   createTray();
+  setupAutoUpdates();
   if (process.platform === "darwin") {
     app.dock.hide();
   }
 });
 
-app.on("window-all-closed", (event) => {
-  if (process.platform === "darwin") {
-    event.preventDefault();
-  } else {
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
     app.quit();
   }
 });

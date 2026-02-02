@@ -1,42 +1,94 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import { describe, expect, it } from "vitest";
+import type { UserConfig } from "@molty/shared";
 import { createServer } from "../src/app.js";
+import type { ConfigRepository } from "../src/repository.js";
 
-const createTempDir = async () => mkdtemp(path.join(os.tmpdir(), "molty-server-"));
+const createMemoryRepository = (): ConfigRepository => {
+  let config: UserConfig = {
+    wakawarsUsername: "",
+    apiKey: "",
+    passwordHash: null,
+    friends: []
+  };
+
+  return {
+    getConfig: async () => config,
+    saveConfig: async ({ wakawarsUsername, apiKey }) => {
+      config = { ...config, wakawarsUsername, apiKey };
+      return config;
+    },
+    addFriend: async ({ username, apiKey }) => {
+      if (!username || username === config.wakawarsUsername) {
+        return config;
+      }
+
+      const exists = config.friends.find((friend) => friend.username === username);
+      if (!exists) {
+        config = {
+          ...config,
+          friends: [...config.friends, { username, apiKey: apiKey ?? null }]
+        };
+      } else if (apiKey) {
+        config = {
+          ...config,
+          friends: config.friends.map((friend) =>
+            friend.username === username
+              ? {
+                  ...friend,
+                  apiKey: apiKey ?? friend.apiKey
+                }
+              : friend
+          )
+        };
+      }
+
+      return config;
+    },
+    removeFriend: async (username) => {
+      config = {
+        ...config,
+        friends: config.friends.filter((friend) => friend.username !== username)
+      };
+      return config;
+    },
+    getAuthState: async () => ({
+      userId: 1,
+      wakawarsUsername: config.wakawarsUsername,
+      passwordHash: config.passwordHash ?? null
+    }),
+    setPassword: async (passwordHash) => {
+      config = { ...config, passwordHash };
+      return config;
+    }
+  };
+};
 
 describe("server app", () => {
-  let dataDir = "";
-
-  beforeEach(async () => {
-    dataDir = await createTempDir();
-  });
-
-  afterEach(async () => {
-    if (dataDir) {
-      await rm(dataDir, { recursive: true, force: true });
-    }
-  });
-
   it("stores config and returns public config", async () => {
-    const { app } = createServer({ dataDir, port: 0, fetcher: async () => new Response() });
+    const { app } = createServer({
+      port: 0,
+      repository: createMemoryRepository(),
+      fetcher: async () => new Response()
+    });
 
     const response = await app.handle(
-      new Request("http://localhost/config", {
+      new Request("http://localhost/wakawars/v0/config", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: "mo", apiKey: "key" })
+        body: JSON.stringify({
+          wakawarsUsername: "mo",
+          apiKey: "key"
+        })
       })
     );
 
-    const payload = (await response.json()) as { username: string; hasApiKey: boolean };
-    expect(payload.username).toBe("mo");
+    const payload = (await response.json()) as { wakawarsUsername: string; hasApiKey: boolean };
+    expect(payload.wakawarsUsername).toBe("mo");
     expect(payload.hasApiKey).toBe(true);
 
-    const configResponse = await app.handle(new Request("http://localhost/config"));
-    const configPayload = (await configResponse.json()) as { username: string; hasApiKey: boolean };
-    expect(configPayload.username).toBe("mo");
+    const configResponse = await app.handle(new Request("http://localhost/wakawars/v0/config"));
+    const configPayload = (await configResponse.json()) as { wakawarsUsername: string; hasApiKey: boolean };
+    expect(configPayload.wakawarsUsername).toBe("mo");
     expect(configPayload.hasApiKey).toBe(true);
   });
 
@@ -58,18 +110,25 @@ describe("server app", () => {
       });
     };
 
-    const { app } = createServer({ dataDir, port: 0, fetcher: mockFetch as typeof fetch });
+    const { app } = createServer({
+      port: 0,
+      repository: createMemoryRepository(),
+      fetcher: mockFetch as typeof fetch
+    });
 
     await app.handle(
-      new Request("http://localhost/config", {
+      new Request("http://localhost/wakawars/v0/config", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: "mo", apiKey: "key" })
+        body: JSON.stringify({
+          wakawarsUsername: "mo",
+          apiKey: "key"
+        })
       })
     );
 
     await app.handle(
-      new Request("http://localhost/friends", {
+      new Request("http://localhost/wakawars/v0/friends", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: "amy" })
@@ -77,16 +136,18 @@ describe("server app", () => {
     );
 
     await app.handle(
-      new Request("http://localhost/friends", {
+      new Request("http://localhost/wakawars/v0/friends", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: "ben" })
       })
     );
 
-    const statsResponse = await app.handle(new Request("http://localhost/stats/today"));
+    const statsResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/stats/today")
+    );
     const statsPayload = (await statsResponse.json()) as { entries: Array<{ username: string }> };
-    expect(statsPayload.entries.map((entry) => entry.username)).toEqual(["amy", "mo", "ben"]);
+    expect(statsPayload.entries.map((entry) => entry.username)).toEqual(["amy", "ben", "mo"]);
   });
 
   it("marks private users when unauthorized", async () => {
@@ -100,25 +161,34 @@ describe("server app", () => {
       });
     };
 
-    const { app } = createServer({ dataDir, port: 0, fetcher: mockFetch as typeof fetch });
+    const { app } = createServer({
+      port: 0,
+      repository: createMemoryRepository(),
+      fetcher: mockFetch as typeof fetch
+    });
 
     await app.handle(
-      new Request("http://localhost/config", {
+      new Request("http://localhost/wakawars/v0/config", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username: "mo", apiKey: "key" })
+        body: JSON.stringify({
+          wakawarsUsername: "mo",
+          apiKey: "key"
+        })
       })
     );
 
     await app.handle(
-      new Request("http://localhost/friends", {
+      new Request("http://localhost/wakawars/v0/friends", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ username: "private" })
       })
     );
 
-    const statsResponse = await app.handle(new Request("http://localhost/stats/today"));
+    const statsResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/stats/today")
+    );
     const statsPayload = (await statsResponse.json()) as {
       entries: Array<{ username: string; status: string }>;
     };

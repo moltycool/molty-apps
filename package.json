@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "concurrently -k \"npm -w packages/shared run build:watch\" \"npm -w apps/server run build:watch\" \"npm -w apps/desktop run dev\"",
-    "build": "npm -w packages/shared run build && npm -w apps/server run build && npm -w apps/desktop run build",
+    "dev": "concurrently -k \"npm -w packages/shared run build:watch\" \"npm -w apps/server run dev\" \"npm -w apps/wakawars run dev\"",
+    "build": "npm -w packages/shared run build && npm -w apps/server run build && npm -w apps/wakawars run build",
     "test": "npm -w packages/shared run test && npm -w apps/server run test",
     "lint": "echo \"lint not configured\""
   },

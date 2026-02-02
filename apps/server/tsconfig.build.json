@@ -4,7 +4,13 @@
     "noEmit": false,
     "outDir": "dist",
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@molty/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@molty/shared/*": ["../../packages/shared/dist/*"]
+    }
   },
   "include": ["src"]
 }
