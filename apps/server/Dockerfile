@@ -1,6 +1,6 @@
 FROM oven/bun:1.2.9
 
-WORKDIR /apps/server
+WORKDIR /usr/src/app
 
 # Copy Node.js binary for tooling that expects it (Prisma)
 COPY --from=node:20.15.1 /usr/local/bin/node /usr/local/bin/node
@@ -36,7 +36,7 @@ EXPOSE 3000
 ENV APP_VERSION=""
 ENV BUILD_TIME=""
 
-WORKDIR /apps/server/apps/server
+WORKDIR /usr/src/app/apps/server
 
 # Use a shell script to source environment and run the app
 ENTRYPOINT ["/bin/sh", "-c", "export $(cat /tmp/build-env 2>/dev/null | xargs) && exec bun src/cli.ts"]
