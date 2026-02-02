@@ -1,6 +1,6 @@
 {
   "name": "@molty/wakawars",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "main": "dist/main.js",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@molty/shared": "workspace:*",
     "electron-updater": "^6.3.0",
+    "fs-extra": "^11.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -55,6 +56,7 @@
         "zip"
       ],
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist"

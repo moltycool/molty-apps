@@ -9,6 +9,8 @@ coverage/
 # Production
 dist/
 build/
+!apps/wakawars/build/
+!apps/wakawars/build/**
 
 # TypeScript
 *.tsbuildinfo
