@@ -25,6 +25,7 @@ import {
 
 const logoUrl = new URL("./assets/logo.svg", import.meta.url).toString();
 const logoMaskStyle = { "--logo-mask": `url(${logoUrl})` } as CSSProperties;
+const appVersion = __APP_VERSION__;
 
 const initialOnboardingState = { wakawarsUsername: "", apiKey: "" };
 const initialLoginState = { username: "", password: "" };
@@ -35,6 +36,11 @@ type SessionState = {
   passwordSet: boolean;
   wakawarsUsername?: string;
   hasUser: boolean;
+};
+
+type VersionPayload = {
+  version?: string;
+  buildTime?: string;
 };
 
 type AddFriendCardProps = {
@@ -105,6 +111,8 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(() =>
     localStorage.getItem("wakawarsSession")
   );
@@ -181,6 +189,32 @@ const App = () => {
     },
     [apiBase, sessionId]
   );
+
+  const checkForUpdates = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    try {
+      const base = import.meta.env.BASE_URL ?? "/";
+      const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+      const versionUrl = new URL(
+        `${normalizedBase}version.json`,
+        window.location.origin
+      );
+      versionUrl.searchParams.set("t", String(Date.now()));
+      const response = await fetch(versionUrl.toString(), { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as VersionPayload;
+      if (!payload?.version) return;
+      if (payload.version !== appVersion) {
+        setUpdateAvailable(true);
+        setLatestVersion(payload.version);
+      } else {
+        setUpdateAvailable(false);
+        setLatestVersion(null);
+      }
+    } catch {
+      // Ignore version check failures.
+    }
+  }, []);
 
   const loadSession = useCallback(async () => {
     try {
@@ -314,6 +348,15 @@ const App = () => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("wakawarsTheme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    checkForUpdates();
+    const intervalId = window.setInterval(() => {
+      checkForUpdates();
+    }, 5 * 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [checkForUpdates]);
 
   useEffect(() => {
     if (!apiBase) return;
@@ -668,6 +711,10 @@ const App = () => {
     }
   };
 
+  const handleUpdate = () => {
+    window.location.reload();
+  };
+
   const lastUpdated = useMemo(() => {
     const updatedAt =
       activeLeagueTab === "weekly" ? weeklyStats?.updatedAt : stats?.updatedAt;
@@ -689,16 +736,6 @@ const App = () => {
 
   const activeStats = activeLeagueTab === "weekly" ? weeklyStats : stats;
   const activeEntries: RowEntry[] = activeStats?.entries ?? [];
-
-  const leaderboardSlices = useMemo(() => {
-    if (!config?.wakawarsUsername || activeEntries.length === 0) {
-      return null;
-    }
-    return sliceLeaderboard(activeEntries, config.wakawarsUsername, {
-      podiumCount: 3,
-      aroundCount: 1,
-    });
-  }, [activeEntries, config?.wakawarsUsername]);
 
   const yesterdayPodium = useMemo(() => {
     if (!config?.wakawarsUsername || !yesterdayStats?.entries?.length) {
@@ -746,15 +783,6 @@ const App = () => {
     [selfDailyEntry, selfWeeklyEntry]
   );
 
-  const showNearMe = Boolean(
-    leaderboardSlices?.nearMe.some(
-      (entry) =>
-        !leaderboardSlices?.podium.some(
-          (podiumEntry) => podiumEntry.username === entry.username
-        )
-    )
-  );
-
   const showLogin = Boolean(session?.hasUser && !session?.authenticated);
   const showAuth = !isAuthenticated;
   const showWelcome = showAuth && authView === "welcome";
@@ -774,6 +802,26 @@ const App = () => {
   }, [showSettings, showAuth, authView, activeLeagueTab]);
   const canRefresh =
     !showAuth && !showSettings && isConfigured && isAuthenticated;
+  const updateLabel = latestVersion ? `Update v${latestVersion}` : "Update";
+  const updateButton = updateAvailable ? (
+    <button
+      type="button"
+      className="primary update-button"
+      onClick={handleUpdate}
+      aria-label={
+        latestVersion
+          ? `Update to version ${latestVersion}`
+          : "Update to the latest version"
+      }
+      title={
+        latestVersion
+          ? `Update to v${latestVersion}`
+          : "Update to the latest version"
+      }
+    >
+      {updateLabel}
+    </button>
+  ) : null;
 
   if (showMainLoading) {
     return (
@@ -795,7 +843,7 @@ const App = () => {
               <span className="brand-sub">{headerSubtitle}</span>
             </div>
           </div>
-          <div className="header-meta" />
+          <div className="header-meta">{updateButton}</div>
         </header>
         {error && (
           <div className="error">
@@ -839,7 +887,7 @@ const App = () => {
               <span className="brand-sub">{headerSubtitle}</span>
             </div>
           </div>
-          <div className="header-meta" />
+          <div className="header-meta">{updateButton}</div>
         </header>
         <section className="panel">
           <div className="panel-head">
@@ -880,6 +928,7 @@ const App = () => {
             </div>
           </div>
           <div className="header-meta">
+            {updateButton}
             {canRefresh && (
               <button
                 type="button"
@@ -1525,25 +1574,6 @@ const App = () => {
                           <p className="muted">No ranked entries yet.</p>
                         )}
                       </div>
-                      {showNearMe ? (
-                        <div className="subcard">
-                          <div className="subcard-header">
-                            <h3>Nearby rivals</h3>
-                            <span className="muted">±1 rank</span>
-                          </div>
-                          <div className="mini-list">
-                            {leaderboardSlices.nearMe.map((entry) => (
-                              <MiniRow
-                                key={`near-${entry.username}`}
-                                entry={entry}
-                                isSelf={
-                                  entry.username === config?.wakawarsUsername
-                                }
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1725,8 +1755,8 @@ const BaseLeaderboardRow = ({
       </div>
       <div className="row-meta">
         <div className="row-meta-top">
-          <span className="rank-display">{rankLabel}</span>
           {timeLabel && <span className={timeClass}>{timeLabel}</span>}
+          <span className="rank-display">{rankLabel}</span>
         </div>
       </div>
     </div>

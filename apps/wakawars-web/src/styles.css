@@ -827,10 +827,10 @@ h3 {
 }
 
 .row-meta-top {
-  display: grid;
-  grid-template-columns: 24px auto;
+  display: flex;
   align-items: center;
-  column-gap: 8px;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .rank-display {
@@ -1237,6 +1237,14 @@ button.ghost.tiny {
   font-size: 9px;
   padding: 3px 6px;
   letter-spacing: 0.06em;
+}
+
+button.update-button {
+  padding: 5px 10px;
+  font-size: 9px;
+  border-radius: 999px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 button:disabled {
