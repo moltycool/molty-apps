@@ -75,6 +75,48 @@ type AchievementCatalogPayload = {
   achievements: AchievementCatalogItem[];
 };
 
+type AchievementRarity = "common" | "rare" | "epic" | "legendary";
+
+const COMMON_ACHIEVEMENT_IDS = new Set([
+  "quick-boot-4h",
+  "focus-reactor-6h",
+  "weekend-warrior-8h",
+  "workweek-warrior-40h",
+  "seven-sunrise-week",
+]);
+
+const EPIC_ACHIEVEMENT_IDS = new Set([
+  "merge-mountain-12h",
+  "night-shift-14h",
+  "switchblade-day-8h",
+  "language-juggler-day-8h",
+  "green-wall-80h",
+  "polyglot-stack-80h",
+  "language-hydra-80h",
+  "project-monolith-80h",
+  "project-nomad-80h",
+  "iron-week-4h",
+]);
+
+const LEGENDARY_ACHIEVEMENT_IDS = new Set([
+  "legendary-commit-16h",
+  "boss-raid-20h",
+  "graph-overflow-100h",
+  "matrix-120h",
+  "mono-stack-80h",
+  "mono-stack-100h",
+  "language-spectrum-80h",
+  "editor-arsenal-80h",
+  "ultra-pace-10h",
+]);
+
+const getAchievementRarity = (achievementId: string): AchievementRarity => {
+  if (LEGENDARY_ACHIEVEMENT_IDS.has(achievementId)) return "legendary";
+  if (EPIC_ACHIEVEMENT_IDS.has(achievementId)) return "epic";
+  if (COMMON_ACHIEVEMENT_IDS.has(achievementId)) return "common";
+  return "rare";
+};
+
 type AddFriendCardProps = {
   docked?: boolean;
   dismissible?: boolean;
@@ -2411,27 +2453,33 @@ const AchievementCatalogCard = ({
   achievement,
 }: {
   achievement: AchievementCatalogItem;
-}) => (
-  <div
-    className={`achievement-catalog-card ${
-      achievement.unlocked ? "unlocked" : "locked"
-    }`}
-  >
-    <div className="achievement-catalog-icon">{achievement.icon}</div>
-    <div className="achievement-catalog-copy">
-      <div className="achievement-catalog-title-row">
-        <span className="achievement-catalog-title">{achievement.title}</span>
-        <span className="achievement-catalog-count">
-          {achievement.count > 0 ? `${achievement.count}x` : "Locked"}
+}) => {
+  const rarity = getAchievementRarity(achievement.id);
+
+  return (
+    <div
+      className={`achievement-catalog-card ${
+        achievement.unlocked ? "unlocked" : "locked"
+      } rarity-${rarity}`}
+      data-rarity={rarity}
+      aria-disabled={!achievement.unlocked}
+    >
+      <div className="achievement-catalog-icon">{achievement.icon}</div>
+      <div className="achievement-catalog-copy">
+        <div className="achievement-catalog-title-row">
+          <span className="achievement-catalog-title">{achievement.title}</span>
+          <span className="achievement-catalog-count">
+            {achievement.count > 0 ? `${achievement.count}x` : "Locked"}
+          </span>
+        </div>
+        <p className="achievement-catalog-desc">{achievement.description}</p>
+        <span className="achievement-catalog-meta">
+          Last unlock: {formatOptionalAchievementDate(achievement.lastAwardedAt)}
         </span>
       </div>
-      <p className="achievement-catalog-desc">{achievement.description}</p>
-      <span className="achievement-catalog-meta">
-        Last unlock: {formatOptionalAchievementDate(achievement.lastAwardedAt)}
-      </span>
     </div>
-  </div>
-);
+  );
+};
 
 const UserAchievementsModal = ({
   modalRef,
@@ -2468,27 +2516,35 @@ const UserAchievementsModal = ({
         <p className="muted">No achievements unlocked yet.</p>
       ) : (
         <div className="achievement-hover-list">
-          {achievements.map((achievement) => (
-            <div key={achievement.id} className="achievement-hover-item">
+          {achievements.map((achievement) => {
+            const rarity = getAchievementRarity(achievement.id);
+
+            return (
               <div
-                className="achievement-hover-icon"
-                title={achievement.description}
-                aria-label={`${achievement.title}: ${achievement.description}`}
+                key={achievement.id}
+                className={`achievement-hover-item rarity-${rarity}`}
+                data-rarity={rarity}
               >
-                {achievement.icon}
-                <span className="achievement-hover-count-badge">
-                  {achievement.count}x
-                </span>
-              </div>
-              <div className="achievement-hover-copy">
-                <div className="achievement-hover-title-row">
-                  <span className="achievement-hover-title">
-                    {achievement.title}
+                <div
+                  className="achievement-hover-icon"
+                  title={achievement.description}
+                  aria-label={`${achievement.title}: ${achievement.description}`}
+                >
+                  {achievement.icon}
+                  <span className="achievement-hover-count-badge">
+                    {achievement.count}x
                   </span>
                 </div>
+                <div className="achievement-hover-copy">
+                  <div className="achievement-hover-title-row">
+                    <span className="achievement-hover-title">
+                      {achievement.title}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </aside>
