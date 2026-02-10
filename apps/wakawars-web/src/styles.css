@@ -874,6 +874,22 @@ h3 {
   background: rgba(15, 24, 42, 0.75);
 }
 
+.row-item-trigger {
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.row-item-trigger:hover,
+.row-item-trigger:focus-visible {
+  border-color: rgba(255, 209, 102, 0.7);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.row-item-trigger:active {
+  transform: translateY(0);
+}
+
 :root[data-theme="light"] .row-item {
   background: #ffffff;
 }
@@ -942,25 +958,14 @@ h3 {
 }
 
 .username-trigger {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  background: transparent;
   color: inherit;
-  text-transform: none;
-  letter-spacing: normal;
-  font-family: var(--font-body);
-  font-size: inherit;
   font-weight: 700;
-  cursor: pointer;
-  box-shadow: none;
 }
 
-.username-trigger:hover,
-.username-trigger:focus-visible {
+.row-item-trigger:hover .username-trigger,
+.row-item-trigger:focus-visible .username-trigger {
   color: var(--accent);
-  text-decoration: underline;
-  outline: none;
+  text-decoration: none;
 }
 
 .badge {
@@ -1565,19 +1570,22 @@ button.icon-button.small:active:not(:disabled) {
 }
 
 .achievement-hover-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .achievement-hover-item {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
   border-radius: 12px;
   border: 2px solid var(--stroke);
   background: rgba(12, 18, 32, 0.72);
-  padding: 8px;
+  padding: 8px 6px;
+  text-align: center;
 }
 
 :root[data-theme="light"] .achievement-hover-item {
@@ -1585,40 +1593,60 @@ button.icon-button.small:active:not(:disabled) {
 }
 
 .achievement-hover-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
   border: 2px solid var(--stroke);
   background: rgba(255, 209, 102, 0.25);
   display: grid;
   place-items: center;
   color: #1b1c24;
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 20px;
+  cursor: help;
 }
 
 .achievement-hover-copy {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  width: 100%;
 }
 
 .achievement-hover-title-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 2px;
 }
 
 .achievement-hover-title {
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  line-height: 1.25;
 }
 
-.achievement-hover-count {
-  font-size: 10px;
+.achievement-hover-count-badge {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 2px solid var(--stroke);
+  background: linear-gradient(135deg, #ffd166, #ff9f43);
+  color: #1b1c24;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
   font-family: var(--font-display);
-  color: var(--accent);
+  line-height: 1;
+  pointer-events: none;
 }
 
 .achievement-hover-desc {

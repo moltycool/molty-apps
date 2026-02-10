@@ -4,8 +4,10 @@ import {
   useMemo,
   useState,
   useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
   type CSSProperties,
   type FormEvent,
+  type RefObject,
 } from "react";
 import {
   formatDuration,
@@ -235,7 +237,7 @@ const App = () => {
   const competitionRequestAbortRef = useRef<AbortController | null>(null);
   const competitionDebounceRef = useRef<number | null>(null);
   const competitionRequestIdRef = useRef(0);
-  const achievementsHoverCloseRef = useRef<number | null>(null);
+  const achievementsModalRef = useRef<HTMLElement | null>(null);
   const competitionRollbackRef = useRef<{
     previousConfig: PublicConfig | null;
     previousStats: LeaderboardResponse | null;
@@ -1066,46 +1068,22 @@ const App = () => {
     void loadAchievementCatalog(false);
   }, [loadAchievementCatalog]);
 
-  const keepAchievementsModalOpen = useCallback(() => {
-    if (achievementsHoverCloseRef.current) {
-      window.clearTimeout(achievementsHoverCloseRef.current);
-      achievementsHoverCloseRef.current = null;
-    }
-  }, []);
-
-  const closeAchievementsModalSoon = useCallback(() => {
-    if (achievementsHoverCloseRef.current) {
-      window.clearTimeout(achievementsHoverCloseRef.current);
-    }
-    achievementsHoverCloseRef.current = window.setTimeout(() => {
-      setHoveredUsername(null);
-      achievementsHoverCloseRef.current = null;
-    }, 140);
-  }, []);
-
   const fetchUserAchievements = useCallback(
     async (username: string, force = false) => {
       const normalized = username.trim().toLowerCase();
       if (!normalized) return;
 
-      let shouldFetch = force;
-      setUserAchievements((prev) => {
-        const existing = prev[normalized];
-        if (!force && (existing?.loading || existing?.data)) {
-          return prev;
-        }
-        shouldFetch = true;
-        return {
-          ...prev,
-          [normalized]: {
-            loading: true,
-            data: existing?.data ?? null,
-            error: null,
-          },
-        };
-      });
+      const existing = userAchievements[normalized];
+      if (!force && (existing?.loading || existing?.data)) return;
 
-      if (!shouldFetch) return;
+      setUserAchievements((prev) => ({
+        ...prev,
+        [normalized]: {
+          loading: true,
+          data: prev[normalized]?.data ?? null,
+          error: null,
+        },
+      }));
 
       try {
         const payload = await request<UserAchievementsPayload>(
@@ -1132,18 +1110,17 @@ const App = () => {
         }));
       }
     },
-    [request]
+    [request, userAchievements]
   );
 
-  const handleUsernameHover = useCallback(
+  const handleRowSelect = useCallback(
     (username: string) => {
       const normalized = username.trim().toLowerCase();
       if (!normalized) return;
-      keepAchievementsModalOpen();
       setHoveredUsername(normalized);
       void fetchUserAchievements(normalized);
     },
-    [fetchUserAchievements, keepAchievementsModalOpen]
+    [fetchUserAchievements]
   );
 
   useEffect(() => {
@@ -1166,12 +1143,30 @@ const App = () => {
   }, [activeTab, loadAchievementCatalog]);
 
   useEffect(() => {
-    return () => {
-      if (achievementsHoverCloseRef.current) {
-        window.clearTimeout(achievementsHoverCloseRef.current);
+    if (!hoveredUsername) return;
+
+    const onDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (achievementsModalRef.current?.contains(target)) return;
+      if (target.closest(".row-item-trigger")) return;
+      setHoveredUsername(null);
+    };
+
+    const onDocumentKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setHoveredUsername(null);
       }
     };
-  }, []);
+
+    document.addEventListener("mousedown", onDocumentMouseDown);
+    document.addEventListener("keydown", onDocumentKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onDocumentMouseDown);
+      document.removeEventListener("keydown", onDocumentKeyDown);
+    };
+  }, [hoveredUsername]);
 
   useEffect(() => {
     if (!config || competitionState === null) return;
@@ -2265,16 +2260,14 @@ const App = () => {
                                 displayPinnedEntry as WeeklyLeaderboardEntry
                               }
                               isSelf
-                              onUsernameEnter={handleUsernameHover}
-                              onUsernameLeave={closeAchievementsModalSoon}
+                              onSelect={handleRowSelect}
                             />
                           ) : (
                             <LeaderboardRow
                               key={`self-${displayPinnedEntry.username}`}
                               entry={displayPinnedEntry as LeaderboardEntry}
                               isSelf
-                              onUsernameEnter={handleUsernameHover}
-                              onUsernameLeave={closeAchievementsModalSoon}
+                              onSelect={handleRowSelect}
                             />
                           ))}
                         {activeLeagueTab === "weekly"
@@ -2285,8 +2278,7 @@ const App = () => {
                                 isSelf={
                                   entry.username === config?.wakawarsUsername
                                 }
-                                onUsernameEnter={handleUsernameHover}
-                                onUsernameLeave={closeAchievementsModalSoon}
+                                onSelect={handleRowSelect}
                               />
                             ))
                           : listEntries.map((entry) => (
@@ -2296,8 +2288,7 @@ const App = () => {
                                 isSelf={
                                   entry.username === config?.wakawarsUsername
                                 }
-                                onUsernameEnter={handleUsernameHover}
-                                onUsernameLeave={closeAchievementsModalSoon}
+                                onSelect={handleRowSelect}
                               />
                             ))}
                       </div>
@@ -2340,10 +2331,9 @@ const App = () => {
           </section>
           {showHoverModal && hoveredUsername && hoveredAchievementsState && (
             <UserAchievementsModal
+              modalRef={achievementsModalRef}
               username={hoveredAchievementsState.data?.username ?? hoveredUsername}
               state={hoveredAchievementsState}
-              onMouseEnter={keepAchievementsModalOpen}
-              onMouseLeave={closeAchievementsModalSoon}
               onRetry={() => {
                 void fetchUserAchievements(hoveredUsername, true);
               }}
@@ -2444,26 +2434,20 @@ const AchievementCatalogCard = ({
 );
 
 const UserAchievementsModal = ({
+  modalRef,
   username,
   state,
-  onMouseEnter,
-  onMouseLeave,
   onRetry,
 }: {
+  modalRef: RefObject<HTMLElement>;
   username: string;
   state: { loading: boolean; data: UserAchievementsPayload | null; error: string | null };
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
   onRetry: () => void;
 }) => {
   const achievements = state.data?.achievements ?? [];
 
   return (
-    <aside
-      className="achievement-hover-modal"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
+    <aside ref={modalRef} className="achievement-hover-modal">
       <div className="achievement-hover-head">
         <p className="eyebrow">Achievements</p>
         <h3>{username}</h3>
@@ -2486,22 +2470,22 @@ const UserAchievementsModal = ({
         <div className="achievement-hover-list">
           {achievements.map((achievement) => (
             <div key={achievement.id} className="achievement-hover-item">
-              <div className="achievement-hover-icon">{achievement.icon}</div>
+              <div
+                className="achievement-hover-icon"
+                title={achievement.description}
+                aria-label={`${achievement.title}: ${achievement.description}`}
+              >
+                {achievement.icon}
+                <span className="achievement-hover-count-badge">
+                  {achievement.count}x
+                </span>
+              </div>
               <div className="achievement-hover-copy">
                 <div className="achievement-hover-title-row">
                   <span className="achievement-hover-title">
                     {achievement.title}
                   </span>
-                  <span className="achievement-hover-count">
-                    {achievement.count}x
-                  </span>
                 </div>
-                <span className="achievement-hover-desc">
-                  {achievement.description}
-                </span>
-                <span className="achievement-hover-meta">
-                  Last unlock: {formatAchievementDate(achievement.lastAwardedAt)}
-                </span>
               </div>
             </div>
           ))}
@@ -2531,39 +2515,37 @@ const BaseLeaderboardRow = ({
   entry,
   isSelf,
   secondary,
-  onUsernameEnter,
-  onUsernameLeave,
+  onSelect,
 }: {
   entry: RowEntry;
   isSelf: boolean;
   secondary?: string | null;
-  onUsernameEnter?: (username: string) => void;
-  onUsernameLeave?: () => void;
+  onSelect?: (username: string) => void;
 }) => {
   const { rankLabel, podiumClass } = rankDisplay(entry.rank ?? null);
   const timeLabel = statusLabel(entry.status, entry.totalSeconds);
   const timeClass = entry.status === "ok" ? "time" : "time muted status";
+  const handleClick = () => onSelect?.(entry.username);
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!onSelect) return;
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelect(entry.username);
+  };
 
   return (
     <div
-      className={`row-item ${isSelf ? "self" : ""} ${podiumClass} status-${
-        entry.status
-      }`}
+      className={`row-item row-item-trigger ${isSelf ? "self" : ""} ${podiumClass} status-${entry.status}`}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect ? handleClick : undefined}
+      onKeyDown={handleKeyDown}
     >
       <div className="row-item-left">
         <div className="avatar">{entry.username.slice(0, 1).toUpperCase()}</div>
         <div className="row-content">
           <div className="row-title">
-            <button
-              type="button"
-              className="username-trigger"
-              onMouseEnter={() => onUsernameEnter?.(entry.username)}
-              onMouseLeave={onUsernameLeave}
-              onFocus={() => onUsernameEnter?.(entry.username)}
-              onBlur={onUsernameLeave}
-            >
-              {entry.username}
-            </button>
+            <span className="username-trigger">{entry.username}</span>
             {isSelf && <span className="badge">YOU</span>}
           </div>
           {secondary && (
@@ -2586,20 +2568,17 @@ const BaseLeaderboardRow = ({
 const LeaderboardRow = ({
   entry,
   isSelf,
-  onUsernameEnter,
-  onUsernameLeave,
+  onSelect,
 }: {
   entry: LeaderboardEntry;
   isSelf: boolean;
-  onUsernameEnter?: (username: string) => void;
-  onUsernameLeave?: () => void;
+  onSelect?: (username: string) => void;
 }) => {
   return (
     <BaseLeaderboardRow
       entry={entry}
       isSelf={isSelf}
-      onUsernameEnter={onUsernameEnter}
-      onUsernameLeave={onUsernameLeave}
+      onSelect={onSelect}
     />
   );
 };
@@ -2607,13 +2586,11 @@ const LeaderboardRow = ({
 const WeeklyLeaderboardRow = ({
   entry,
   isSelf,
-  onUsernameEnter,
-  onUsernameLeave,
+  onSelect,
 }: {
   entry: WeeklyLeaderboardEntry;
   isSelf: boolean;
-  onUsernameEnter?: (username: string) => void;
-  onUsernameLeave?: () => void;
+  onSelect?: (username: string) => void;
 }) => {
   const averageLabel =
     entry.status === "ok" ? formatDuration(entry.dailyAverageSeconds) : null;
@@ -2623,8 +2600,7 @@ const WeeklyLeaderboardRow = ({
       entry={entry}
       isSelf={isSelf}
       secondary={averageLabel ? `Avg ${averageLabel}/day` : null}
-      onUsernameEnter={onUsernameEnter}
-      onUsernameLeave={onUsernameLeave}
+      onSelect={onSelect}
     />
   );
 };
