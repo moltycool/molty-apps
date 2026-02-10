@@ -1215,29 +1215,6 @@ input[type="password"]::placeholder {
   flex-shrink: 0;
 }
 
-.settings-achievement-catalog {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.settings-achievement-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.settings-achievement-head h3 {
-  margin: 0;
-  font-size: 12px;
-}
-
-.settings-achievement-grid {
-  grid-template-columns: 1fr;
-}
-
 .visibility-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

@@ -1161,7 +1161,7 @@ const App = () => {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== "achievements" && activeTab !== "settings") return;
+    if (activeTab !== "achievements") return;
     void loadAchievementCatalog(false);
   }, [activeTab, loadAchievementCatalog]);
 
@@ -2003,52 +2003,6 @@ const App = () => {
             ) : (
               <p className="muted">No rivals yet. Recruit them below.</p>
             )}
-            <div className="settings-achievement-catalog">
-              <div className="settings-achievement-head">
-                <div>
-                  <h3>Achievement catalog</h3>
-                  <p className="muted">
-                    {achievementCatalog
-                      ? `${achievementCatalog.unlockedCount}/${achievementCatalog.totalDefined} unlocked`
-                      : "Loading all system achievements..."}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="ghost tiny"
-                  onClick={() => {
-                    void loadAchievementCatalog(true);
-                  }}
-                  disabled={achievementCatalogLoading}
-                >
-                  Refresh
-                </button>
-              </div>
-              {achievementCatalogLoading && !achievementCatalog ? (
-                <div className="loading-shimmer" aria-hidden="true" />
-              ) : achievementCatalogError && !achievementCatalog ? (
-                <div className="error">
-                  <span>{achievementCatalogError}</span>
-                  <button
-                    className="ghost tiny"
-                    onClick={() => {
-                      void loadAchievementCatalog(true);
-                    }}
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : (
-                <div className="achievement-catalog-grid settings-achievement-grid">
-                  {achievementCatalogEntries.map((achievement) => (
-                    <AchievementCatalogCard
-                      key={`settings-${achievement.id}`}
-                      achievement={achievement}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
           </section>
 
           <section className="panel settings-panel">
