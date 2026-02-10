@@ -1862,13 +1862,6 @@ const App = () => {
                 <h2>Device shield</h2>
                 <p className="muted">Keep this Mac locked to your squad.</p>
               </div>
-              <button
-                type="button"
-                className="ghost tiny"
-                onClick={openAchievementsPage}
-              >
-                View achievements
-              </button>
             </div>
             {session?.passwordSet ? (
               <div className="settings-row">
