@@ -117,6 +117,47 @@ const getAchievementRarity = (achievementId: string): AchievementRarity => {
   return "rare";
 };
 
+const AchievementHeaderIcon = () => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M8 4h8v2a4 4 0 0 1-8 0V4Z" />
+    <path d="M8 5H5a3 3 0 0 0 3 3" />
+    <path d="M16 5h3a3 3 0 0 1-3 3" />
+    <path d="M12 10v3" />
+    <path d="M9.5 16h5" />
+    <path d="M8.5 19h7" />
+  </svg>
+);
+
+const HomeHeaderIcon = () => (
+  <svg
+    aria-hidden="true"
+    focusable="false"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 11.5 12 4l9 7.5" />
+    <path d="M6.5 10.5V20h11v-9.5" />
+    <path d="M10 20v-5h4v5" />
+  </svg>
+);
+
 type AddFriendCardProps = {
   docked?: boolean;
   dismissible?: boolean;
@@ -1449,12 +1490,10 @@ const App = () => {
     }
     return activeLeagueTab === "weekly" ? "Weekly clash" : "Daily arena";
   }, [showAchievements, showSettings, showAuth, authView, activeLeagueTab]);
-  const canRefresh =
-    !showAuth &&
-    !showSettings &&
-    !showAchievements &&
-    isConfigured &&
-    isAuthenticated;
+  const showHomeButton = Boolean(
+    canShowControlTabs && (showSettings || showAchievements)
+  );
+  const canRefresh = Boolean(canShowControlTabs && activeTab === "league");
   const updateLabel = latestVersion ? `Update v${latestVersion}` : "Update";
   const updateButton = updateAvailable ? (
     <button
@@ -1586,7 +1625,18 @@ const App = () => {
           </div>
           <div className="header-meta">
             {updateButton}
-            {canRefresh && (
+            {showHomeButton && (
+              <button
+                type="button"
+                className="icon-button ghost-button"
+                onClick={() => setActiveTab("league")}
+                aria-label="Back to home"
+                title="Back to home"
+              >
+                <HomeHeaderIcon />
+              </button>
+            )}
+            {!showHomeButton && canRefresh && (
               <button
                 type="button"
                 className="icon-button ghost-button"
@@ -1607,7 +1657,7 @@ const App = () => {
                 aria-label="Achievements"
                 title="Open achievements"
               >
-                🏆
+                <AchievementHeaderIcon />
               </button>
             )}
             {canShowControlTabs && (
