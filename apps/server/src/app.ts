@@ -31,6 +31,10 @@ import {
   toAchievementBoard,
   toAchievementDisplay,
 } from "./achievements.js";
+import {
+  HONOR_TITLE_ACHIEVEMENT_IDS,
+  resolveHonorTitlesByUserId,
+} from "./honor-titles.js";
 
 export type ServerOptions = {
   port: number;
@@ -151,6 +155,18 @@ export const createServer = ({
     return shiftDateKey(todayKey, offsetDays);
   };
 
+  const resolveHonorTitles = async (userIds: number[]) => {
+    const grants = await store.listAchievementGrants({
+      userIds,
+      achievementIds: HONOR_TITLE_ACHIEVEMENT_IDS,
+    });
+
+    return resolveHonorTitlesByUserId({
+      userIds,
+      grants,
+    });
+  };
+
   const buildDailyLeaderboard = async (config: UserConfig, offsetDays: number) => {
     const baseDate = new Date();
     const groupPeerIds = new Set(await store.getGroupPeerIds(config.id));
@@ -163,6 +179,7 @@ export const createServer = ({
     const users = userIds
       .map((id) => usersById.get(id))
       .filter((user): user is NonNullable<typeof user> => Boolean(user));
+    const honorTitlesByUserId = await resolveHonorTitles(userIds);
 
     const dateKeyGroups = new Map<string, number[]>();
 
@@ -197,6 +214,7 @@ export const createServer = ({
       const isMutualFriend =
         friendIds.has(user.id) && incomingFriendIds.has(user.id);
       const isGroupConnected = groupPeerIds.has(user.id);
+      const honorTitle = honorTitlesByUserId.get(user.id) ?? null;
       const canView =
         isSelf ||
         user.statsVisibility === "everyone" ||
@@ -205,6 +223,7 @@ export const createServer = ({
       if (!canView) {
         return {
           username: user.wakawarsUsername,
+          honorTitle: null,
           totalSeconds: 0,
           status: "private",
           error: null,
@@ -213,6 +232,7 @@ export const createServer = ({
       if (!stat) {
         return {
           username: user.wakawarsUsername,
+          honorTitle,
           totalSeconds: 0,
           status: "error",
           error: "No stats synced yet",
@@ -221,6 +241,7 @@ export const createServer = ({
 
       return {
         username: user.wakawarsUsername,
+        honorTitle,
         totalSeconds: stat.totalSeconds,
         status: stat.status,
         error: stat.error ?? null,
@@ -936,6 +957,7 @@ export const createServer = ({
           const users = userIds
             .map((id) => usersById.get(id))
             .filter((user): user is NonNullable<typeof user> => Boolean(user));
+          const honorTitlesByUserId = await resolveHonorTitles(userIds);
 
           const weeklyStats = weeklyCache.getStats({ userIds, rangeKey });
           const statsByUserId = new Map(
@@ -952,6 +974,7 @@ export const createServer = ({
             const isMutualFriend =
               friendIds.has(user.id) && incomingFriendIds.has(user.id);
             const isGroupConnected = groupPeerIds.has(user.id);
+            const honorTitle = honorTitlesByUserId.get(user.id) ?? null;
             const canView =
               isSelf ||
               user.statsVisibility === "everyone" ||
@@ -960,6 +983,7 @@ export const createServer = ({
             if (!canView) {
               return {
                 username: user.wakawarsUsername,
+                honorTitle: null,
                 totalSeconds: 0,
                 dailyAverageSeconds: 0,
                 status: "private",
@@ -969,6 +993,7 @@ export const createServer = ({
             if (!stat) {
               return {
                 username: user.wakawarsUsername,
+                honorTitle,
                 totalSeconds: 0,
                 dailyAverageSeconds: 0,
                 status: "error",
@@ -978,6 +1003,7 @@ export const createServer = ({
 
             return {
               username: user.wakawarsUsername,
+              honorTitle,
               totalSeconds: stat.totalSeconds,
               dailyAverageSeconds: stat.dailyAverageSeconds,
               status: stat.status,

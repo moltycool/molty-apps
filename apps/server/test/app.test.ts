@@ -366,6 +366,22 @@ const createMemoryRepository = (): UserRepository => {
         }))
         .sort((a, b) => b.lastAwardedAt.getTime() - a.lastAwardedAt.getTime());
     },
+    listAchievementGrants: async ({ userIds, achievementIds, contextKind }) =>
+      achievements
+        .filter((entry) => userIds.includes(entry.userId))
+        .filter((entry) =>
+          achievementIds && achievementIds.length > 0
+            ? achievementIds.includes(entry.achievementId)
+            : true
+        )
+        .filter((entry) => (contextKind ? entry.contextKind === contextKind : true))
+        .map((entry) => ({
+          userId: entry.userId,
+          achievementId: entry.achievementId,
+          contextKind: entry.contextKind,
+          contextKey: entry.contextKey,
+          awardedAt: entry.awardedAt
+        })),
     createProviderLog: async () => {}
   };
 };
@@ -517,6 +533,197 @@ describe("server app", () => {
     );
     const statsPayload = (await statsResponse.json()) as { entries: Array<{ username: string }> };
     expect(statsPayload.entries.map((entry) => entry.username)).toEqual(["amy", "ben", "mo"]);
+  });
+
+  it("adds honor title for weekly 40h streaks", async () => {
+    const repository = createMemoryRepository();
+    const { app, store } = createServer({
+      port: 0,
+      repository,
+      enableStatusSync: false
+    });
+
+    const { sessionId } = await getSessionId(
+      await app.handle(
+        new Request("http://localhost/wakawars/v0/config", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            wakawarsUsername: "mo",
+            apiKey: "key"
+          })
+        })
+      )
+    );
+
+    await app.handle(
+      new Request("http://localhost/wakawars/v0/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          wakawarsUsername: "amy",
+          apiKey: "key"
+        })
+      })
+    );
+
+    await app.handle(
+      new Request("http://localhost/wakawars/v0/friends", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-wakawars-session": sessionId ?? ""
+        },
+        body: JSON.stringify({ username: "amy" })
+      })
+    );
+
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const mo = await store.getUserByUsername("mo");
+    const amy = await store.getUserByUsername("amy");
+    await store.upsertDailyStat({
+      userId: mo!.id,
+      dateKey,
+      totalSeconds: 900,
+      status: "ok",
+      error: null,
+      fetchedAt: now
+    });
+    await store.upsertDailyStat({
+      userId: amy!.id,
+      dateKey,
+      totalSeconds: 3600,
+      status: "ok",
+      error: null,
+      fetchedAt: now
+    });
+
+    await Promise.all([
+      store.grantAchievement({
+        userId: amy!.id,
+        achievementId: "workweek-warrior-40h",
+        contextKind: "weekly",
+        contextKey: "this_week:2026-W05",
+        awardedAt: new Date("2026-02-02T12:00:00.000Z")
+      }),
+      store.grantAchievement({
+        userId: amy!.id,
+        achievementId: "workweek-warrior-40h",
+        contextKind: "weekly",
+        contextKey: "this_week:2026-W06",
+        awardedAt: new Date("2026-02-09T12:00:00.000Z")
+      }),
+      store.grantAchievement({
+        userId: amy!.id,
+        achievementId: "workweek-warrior-40h",
+        contextKind: "weekly",
+        contextKey: "this_week:2026-W07",
+        awardedAt: new Date("2026-02-16T12:00:00.000Z")
+      }),
+      store.grantAchievement({
+        userId: amy!.id,
+        achievementId: "workweek-warrior-40h",
+        contextKind: "weekly",
+        contextKey: "this_week:2026-W08",
+        awardedAt: new Date("2026-02-23T12:00:00.000Z")
+      })
+    ]);
+
+    const statsResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/stats/today", {
+        headers: { "x-wakawars-session": sessionId ?? "" }
+      })
+    );
+    const statsPayload = (await statsResponse.json()) as {
+      entries: Array<{ username: string; honorTitle?: string | null }>;
+    };
+    const amyEntry = statsPayload.entries.find((entry) => entry.username === "amy");
+    expect(amyEntry?.honorTitle).toBe("Sultan of Weeks");
+  });
+
+  it("maps high-tier achievements to creative honor titles", async () => {
+    const repository = createMemoryRepository();
+    const { app, store } = createServer({
+      port: 0,
+      repository,
+      enableStatusSync: false
+    });
+
+    const { sessionId } = await getSessionId(
+      await app.handle(
+        new Request("http://localhost/wakawars/v0/config", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            wakawarsUsername: "mo",
+            apiKey: "key"
+          })
+        })
+      )
+    );
+
+    await app.handle(
+      new Request("http://localhost/wakawars/v0/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          wakawarsUsername: "amy",
+          apiKey: "key"
+        })
+      })
+    );
+
+    await app.handle(
+      new Request("http://localhost/wakawars/v0/friends", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-wakawars-session": sessionId ?? ""
+        },
+        body: JSON.stringify({ username: "amy" })
+      })
+    );
+
+    const dateKey = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const mo = await store.getUserByUsername("mo");
+    const amy = await store.getUserByUsername("amy");
+    await store.upsertDailyStat({
+      userId: mo!.id,
+      dateKey,
+      totalSeconds: 1200,
+      status: "ok",
+      error: null,
+      fetchedAt: now
+    });
+    await store.upsertDailyStat({
+      userId: amy!.id,
+      dateKey,
+      totalSeconds: 7200,
+      status: "ok",
+      error: null,
+      fetchedAt: now
+    });
+
+    await store.grantAchievement({
+      userId: amy!.id,
+      achievementId: "matrix-120h",
+      contextKind: "weekly",
+      contextKey: "this_week:2026-W09",
+      awardedAt: new Date("2026-03-01T12:00:00.000Z")
+    });
+
+    const statsResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/stats/today", {
+        headers: { "x-wakawars-session": sessionId ?? "" }
+      })
+    );
+    const statsPayload = (await statsResponse.json()) as {
+      entries: Array<{ username: string; honorTitle?: string | null }>;
+    };
+    const amyEntry = statsPayload.entries.find((entry) => entry.username === "amy");
+    expect(amyEntry?.honorTitle).toBe("Matrix Sovereign");
   });
 
   it("includes group members in leaderboards for all members", async () => {

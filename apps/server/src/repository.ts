@@ -51,6 +51,14 @@ export type AchievementUnlockSummary = {
   lastAwardedAt: Date;
 };
 
+export type AchievementGrantSummary = {
+  userId: number;
+  achievementId: string;
+  contextKind: AchievementContextKind;
+  contextKey: string;
+  awardedAt: Date;
+};
+
 export type UserRepository = {
   countUsers: () => Promise<number>;
   listUsers: () => Promise<
@@ -128,6 +136,11 @@ export type UserRepository = {
   listAchievementUnlocks: (input: {
     userId: number;
   }) => Promise<AchievementUnlockSummary[]>;
+  listAchievementGrants: (input: {
+    userIds: number[];
+    achievementIds?: string[];
+    contextKind?: AchievementContextKind;
+  }) => Promise<AchievementGrantSummary[]>;
   createProviderLog: (input: ProviderLogRecord) => Promise<void>;
 };
 
@@ -798,6 +811,45 @@ export const createPrismaRepository = (prisma: PrismaClient): UserRepository => 
       );
   };
 
+  const listAchievementGrants = async ({
+    userIds,
+    achievementIds,
+    contextKind
+  }: {
+    userIds: number[];
+    achievementIds?: string[];
+    contextKind?: AchievementContextKind;
+  }): Promise<AchievementGrantSummary[]> => {
+    if (userIds.length === 0) {
+      return [];
+    }
+
+    const rows = await prisma.ww_user_achievement.findMany({
+      where: {
+        user_id: { in: userIds },
+        ...(achievementIds && achievementIds.length > 0
+          ? { achievement_key: { in: achievementIds } }
+          : {}),
+        ...(contextKind ? { context_kind: contextKind } : {})
+      },
+      select: {
+        user_id: true,
+        achievement_key: true,
+        context_kind: true,
+        context_key: true,
+        awarded_at: true
+      }
+    });
+
+    return rows.map((row) => ({
+      userId: row.user_id,
+      achievementId: row.achievement_key,
+      contextKind: row.context_kind as AchievementContextKind,
+      contextKey: row.context_key,
+      awardedAt: row.awarded_at
+    }));
+  };
+
   const createProviderLog = async ({
     provider,
     userId,
@@ -857,6 +909,7 @@ export const createPrismaRepository = (prisma: PrismaClient): UserRepository => 
     getWeeklyStats,
     grantAchievement,
     listAchievementUnlocks,
+    listAchievementGrants,
     createProviderLog
   };
 };

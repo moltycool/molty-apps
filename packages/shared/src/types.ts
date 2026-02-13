@@ -48,6 +48,7 @@ export type DailyStatStatus = "ok" | "private" | "not_found" | "error";
 
 export type DailyStat = {
   username: string; // WakaWars username
+  honorTitle?: string | null;
   totalSeconds: number;
   status: DailyStatStatus;
   error?: string | null;
@@ -67,6 +68,7 @@ export type LeaderboardResponse = {
 
 export type WeeklyStat = {
   username: string; // WakaWars username
+  honorTitle?: string | null;
   totalSeconds: number;
   dailyAverageSeconds: number;
   status: DailyStatStatus;
