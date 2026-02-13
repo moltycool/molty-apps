@@ -2631,6 +2631,9 @@ const BaseLeaderboardRow = ({
   const { rankLabel, podiumClass } = rankDisplay(entry.rank ?? null);
   const timeLabel = statusLabel(entry.status, entry.totalSeconds);
   const timeClass = entry.status === "ok" ? "time" : "time muted status";
+  const subtitle = [entry.honorTitle ?? null, secondary]
+    .filter((value): value is string => Boolean(value && value.trim().length > 0))
+    .join(" • ");
   const handleClick = () => onSelect?.(entry.username);
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!onSelect) return;
@@ -2654,9 +2657,9 @@ const BaseLeaderboardRow = ({
             <span className="username-trigger">{entry.username}</span>
             {isSelf && <span className="badge">YOU</span>}
           </div>
-          {secondary && (
+          {subtitle && (
             <div className="row-sub">
-              <span>{secondary}</span>
+              <span>{subtitle}</span>
             </div>
           )}
         </div>
