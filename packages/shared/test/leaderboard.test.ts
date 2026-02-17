@@ -56,6 +56,20 @@ describe("computeLeaderboard", () => {
     expect(leaderboard[1].rank).toBe(1);
     expect(leaderboard[2].rank).toBe(3);
   });
+
+  it("assigns unique ranks when all ranked users are at zero", () => {
+    const stats: DailyStat[] = [
+      { username: "zoe", totalSeconds: 0, status: "ok" },
+      { username: "amy", totalSeconds: 0, status: "ok" },
+      { username: "mo", totalSeconds: 0, status: "ok" }
+    ];
+
+    const leaderboard = computeLeaderboard(stats, "mo");
+    expect(leaderboard.map((entry) => entry.username)).toEqual(["amy", "mo", "zoe"]);
+    expect(leaderboard[0].rank).toBe(1);
+    expect(leaderboard[1].rank).toBe(2);
+    expect(leaderboard[2].rank).toBe(3);
+  });
 });
 
 describe("sliceLeaderboard", () => {

@@ -24,6 +24,9 @@ export const computeLeaderboard = <T extends DailyStat>(
   selfUsername: string
 ): Array<T & { rank: number | null; deltaSeconds: number }> => {
   const ordered = sortStats(stats);
+  const ranked = ordered.filter((entry) => entry.status === "ok");
+  const shouldBreakAllZeroTies =
+    ranked.length > 0 && ranked.every((entry) => entry.totalSeconds === 0);
   const selfEntry = ordered.find((entry) => entry.username === selfUsername);
   const selfSeconds = selfEntry?.totalSeconds ?? 0;
 
@@ -33,7 +36,10 @@ export const computeLeaderboard = <T extends DailyStat>(
   return ordered.map((entry, index) => {
     const isRanked = entry.status === "ok";
     if (isRanked) {
-      if (lastSeconds === null || entry.totalSeconds !== lastSeconds) {
+      if (shouldBreakAllZeroTies) {
+        currentRank = index + 1;
+        lastSeconds = entry.totalSeconds;
+      } else if (lastSeconds === null || entry.totalSeconds !== lastSeconds) {
         currentRank = index + 1;
         lastSeconds = entry.totalSeconds;
       }
