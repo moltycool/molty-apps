@@ -244,6 +244,7 @@ const App = () => {
   const [onboarding, setOnboarding] = useState(initialOnboardingState);
   const [login, setLogin] = useState(initialLoginState);
   const [passwordForm, setPasswordForm] = useState(initialPasswordState);
+  const [usernameInput, setUsernameInput] = useState("");
   const [friendInput, setFriendInput] = useState("");
   const [addFriendError, setAddFriendError] = useState<string | null>(null);
   const [groupNameInput, setGroupNameInput] = useState("");
@@ -650,6 +651,10 @@ const App = () => {
   }, [session?.wakawarsUsername, login.username]);
 
   useEffect(() => {
+    setUsernameInput(config?.wakawarsUsername ?? "");
+  }, [config?.wakawarsUsername]);
+
+  useEffect(() => {
     if (!session || authViewInitialized.current) return;
     if (session.hasUser && !session.authenticated) {
       setAuthView("signin");
@@ -755,6 +760,45 @@ const App = () => {
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to set password");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUsernameUpdate = async (event: FormEvent) => {
+    event.preventDefault();
+    const wakawarsUsername = usernameInput.trim().toLowerCase();
+    if (!wakawarsUsername) {
+      setError("WakaWars username is required");
+      return;
+    }
+
+    if (config?.wakawarsUsername === wakawarsUsername) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = await request<PublicConfig>("/username", {
+        method: "POST",
+        body: JSON.stringify({ wakawarsUsername }),
+      });
+      setConfig(payload);
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              wakawarsUsername: payload.wakawarsUsername,
+            }
+          : prev
+      );
+      setLogin((prev) => ({ ...prev, username: payload.wakawarsUsername }));
+      setError(null);
+      await loadStats({ silent: true, includeWeekly: shouldIncludeWeekly });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update username"
+      );
     } finally {
       setLoading(false);
     }
@@ -1451,6 +1495,10 @@ const App = () => {
     : null;
   const showHoverModal =
     Boolean(hoveredUsername) && activeTab === "league" && !showMainLoading;
+  const normalizedUsernameInput = usernameInput.trim().toLowerCase();
+  const canUpdateUsername =
+    Boolean(normalizedUsernameInput) &&
+    normalizedUsernameInput !== (config?.wakawarsUsername ?? "");
   const achievementCatalogEntries = useMemo(() => {
     const entries = achievementCatalog?.achievements ?? [];
     return [...entries].sort((a, b) => {
@@ -1942,6 +1990,38 @@ const App = () => {
         </section>
       ) : showSettings ? (
         <>
+          <section className="panel settings-panel">
+            <div className="panel-head">
+              <div>
+                <p className="eyebrow">Identity</p>
+                <h2>WakaWars username</h2>
+                <p className="muted">
+                  This name is used for friends, squads, and leaderboards.
+                </p>
+              </div>
+            </div>
+            <form className="stack" onSubmit={handleUsernameUpdate}>
+              <label>
+                WakaWars username
+                <input
+                  type="text"
+                  value={usernameInput}
+                  onChange={(event) => setUsernameInput(event.target.value)}
+                  placeholder="wakawars-username"
+                  required
+                  disabled={loading}
+                />
+              </label>
+              <button
+                className="primary"
+                type="submit"
+                disabled={loading || !canUpdateUsername}
+              >
+                Update username
+              </button>
+            </form>
+          </section>
+
           <section className="panel settings-panel">
             <div className="panel-head">
               <div>

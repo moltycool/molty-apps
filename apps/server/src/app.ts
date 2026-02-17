@@ -401,6 +401,39 @@ export const createServer = ({
             }),
           }
         )
+        .post(
+          "/username",
+          async ({ body, headers, set }) => {
+            const wakawarsUsername = normalizeUsername(body.wakawarsUsername);
+            if (!wakawarsUsername) {
+              set.status = 400;
+              return { error: "WakaWars username is required" };
+            }
+
+            const authCheck = await requireSession(headers, set);
+            if (!authCheck.ok) {
+              return { error: "Unauthorized" };
+            }
+
+            const existing = await store.getUserByUsername(wakawarsUsername);
+            if (existing && existing.id !== authCheck.user.id) {
+              set.status = 409;
+              return { error: "Username already taken" };
+            }
+
+            const updated = await store.updateUser(authCheck.user.id, {
+              wakawarsUsername,
+              apiKey: authCheck.user.apiKey,
+            });
+
+            return toPublicConfig(updated);
+          },
+          {
+            body: t.Object({
+              wakawarsUsername: t.String(),
+            }),
+          }
+        )
         .get("/config", async ({ headers, set }) => {
           const authCheck = await requireSession(headers, set);
           if (!authCheck.ok) {
