@@ -415,6 +415,66 @@ describe("server app", () => {
     expect(configPayload.hasApiKey).toBe(true);
   });
 
+  it("updates username from settings session", async () => {
+    const { app } = createServer({
+      port: 0,
+      repository: createMemoryRepository(),
+      enableStatusSync: false
+    });
+
+    const { sessionId } = await getSessionId(
+      await app.handle(
+        new Request("http://localhost/wakawars/v0/config", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            wakawarsUsername: "mo",
+            apiKey: "key"
+          })
+        })
+      )
+    );
+
+    await app.handle(
+      new Request("http://localhost/wakawars/v0/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          wakawarsUsername: "amy",
+          apiKey: "key"
+        })
+      })
+    );
+
+    const updateResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/username", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-wakawars-session": sessionId ?? ""
+        },
+        body: JSON.stringify({ wakawarsUsername: "captain-mo" })
+      })
+    );
+    const updatePayload = (await updateResponse.json()) as {
+      wakawarsUsername: string;
+    };
+    expect(updateResponse.status).toBe(200);
+    expect(updatePayload.wakawarsUsername).toBe("captain-mo");
+
+    const takenResponse = await app.handle(
+      new Request("http://localhost/wakawars/v0/username", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-wakawars-session": sessionId ?? ""
+        },
+        body: JSON.stringify({ wakawarsUsername: "amy" })
+      })
+    );
+    expect(takenResponse.status).toBe(409);
+  });
+
   it("adds friends and returns leaderboard stats", async () => {
     const repository = createMemoryRepository();
     const { app, store } = createServer({
